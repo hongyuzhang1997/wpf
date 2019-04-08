@@ -36,6 +36,7 @@
     <XUnitRunnerConsoleVersion>2.4.0</XUnitRunnerConsoleVersion>
     <XUnitRunnerVisualStudioVersion>2.4.0</XUnitRunnerVisualStudioVersion>
     <XUnitVersion>2.4.0</XUnitVersion>
+    <NewtonsoftJsonVersion>9.0.1</NewtonsoftJsonVersion>
   </PropertyGroup>
   <PropertyGroup>
     <RestoreSources>
