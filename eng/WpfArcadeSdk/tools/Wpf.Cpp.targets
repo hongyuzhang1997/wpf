@@ -5,9 +5,16 @@
   </PropertyGroup>
 
 
+  <!-- 
+    See comment about UsePrivateFrontEnd in Wpf.Cpp.props
+  -->
+  <!--  Start optional section -->
   <PropertyGroup>
     <FrontEndPath Condition="'$(VCToolArchitecture)'=='Native32Bit'">$(MsvcurtC1xxToolsPath)HostX86\c1xx.dll</FrontEndPath>
     <FrontEndPath Condition="'$(VCToolArchitecture)'=='Native64Bit'">$(MsvcurtC1xxToolsPath)HostX64\c1xx.dll</FrontEndPath>
+
+    <BackEndPath Condition="'$(VCToolArchitecture)'=='Native32Bit' And Exists('$(MsvcurtC1xxToolsPath)HostX86\c2.dll')">$(MsvcurtC1xxToolsPath)HostX86\c2.dll</BackEndPath>
+    <BackEndPath Condition="'$(VCToolArchitecture)'=='Native64Bit' And Exists('$(MsvcurtC1xxToolsPath)HostX86\c2.dll')">$(MsvcurtC1xxToolsPath)HostX64\c2.dll</BackEndPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(UsePrivateFrontEnd)'=='true' And '$(ManagedCxx)'=='true' And '$(FrontEndPath)'!=''">
     <ClCompile>
@@ -17,11 +24,19 @@
       <AdditionalOptions>%(AdditionalOptions) /fe:"$(FrontEndPath)"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
-
+  <ItemDefinitionGroup Condition="'$(UsePrivateFrontEnd)'=='true' And '$(ManagedCxx)'=='true' And '$(BackEndPath)'!=''">
+    <ClCompile>
+      <AdditionalOptions>%(AdditionalOptions) /B2"$(BackEndPath)"</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <!-- End optional section --> 
 
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NativeVersionFileDirectory)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="Exists('$(WpfSharedDir)inc\')">%(AdditionalIncludeDirectories);$(WpfSharedDir)inc\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="Exists('$(WpfCommonDir)inc\')">%(AdditionalIncludeDirectories);$(WpfCommonDir)inc\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NativeVersionFileDirectory);$(WpfTracingDir)native\</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(WpfSharedDir)inc\ddbanned.h</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NativeVersionFileDirectory)</AdditionalIncludeDirectories>
@@ -208,7 +223,7 @@ using namespace System::Runtime::Versioning;
     </PropertyGroup>
 
     <ItemGroup>
-      <CppClrSupportProject Include="Project">
+      <CppClrSupportProject Include="ProjectHeader">
         <!-- 
             In the CDATA section that follows, 
               %40 ~= @
@@ -223,12 +238,27 @@ using namespace System::Runtime::Versioning;
     <TargetFramework>netcoreapp3.0</TargetFramework>
     <Platforms>AnyCPU%3Bx64</Platforms>
   </PropertyGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="$(MicrosoftDotNetWpfGitHubPackage)" Version="$(MicrosoftDotNetWpfGitHubVersion)" />
+  ]]>
+        </Text>
+      </CppClrSupportProject>
+
+      <!-- 
+        We need a reference to Microsoft.DotNet.Wpf.GitHub when building from dotnet-wpf-int. 
+        When building from dotnet/wpf, this refernece is not needed.
+      -->
+      <CppClrSupportProject Include="MicrosoftDotNetWpfGitHubPackageReference" Condition="'$(RepoLocation)'=='Internal'">
+        <Text>
+          <![CDATA[
+   <ItemGroup>
+    <PackageReference Include="runtime.$(WpfRuntimeIdentifier).$(MicrosoftDotNetWpfGitHubPackage)" Version="$(MicrosoftDotNetWpfGitHubVersion)" />
   </ItemGroup>
-  
-  <!-- Ensure that LimitMicrosoftDotNetWpfGitHubReferences target doesn't run -->
+  ]]>
+        </Text>
+      </CppClrSupportProject>
+      <CppClrSupportProject Include="ProjectBody">
+        <Text>
+          <![CDATA[
+  <!-- Ensure that LimitMicrosoftDotNetWpfGitHubReferences target doesn't run --> 
   <PropertyGroup>
     <DoNotLimitMicrosoftDotNetWpfGitHubReferences>true</DoNotLimitMicrosoftDotNetWpfGitHubReferences>
   </PropertyGroup>
@@ -258,7 +288,7 @@ using namespace System::Runtime::Versioning;
     <ItemGroup>
       <NugetReferencesForCppCli Remove="%40(NugetReferencesForCppCli)" />
       <NugetReferencesForCppCli Include="%40(ReferencePath)" Condition="'%25(ReferencePath.NuGetPackageId)'=='Microsoft.NETCore.App'"/>
-      <NugetReferencesForCppCli Include="%40(ReferencePath)" Condition="'%25(ReferencePath.NuGetPackageId)'=='Microsoft.DotNet.Wpf.Github'"/>
+      <NugetReferencesForCppCli Include="%40(ReferencePath)" Condition="'%25(ReferencePath.NuGetPackageId)'=='runtime.%24(WpfRuntimeIdentifier).Microsoft.DotNet.Wpf.Github'"/>
     </ItemGroup>
     <FilterItem1ByItem2 Item1="%40(ReferencePath->'%25(NuGetPackageId)')"
                         PreserveItem1Metadata="true"
@@ -279,9 +309,11 @@ using namespace System::Runtime::Versioning;
     <MakeDir Condition="!Exists('$(IntermediateOutputPath)CppCliSupport\')"
              Directories="$(IntermediateOutputPath)CppCliSupport\" />
 
+    <Delete Files="$(CppCliHelperProject)" Condition="Exists('$(CppCliHelperProject)')" />
+    
     <WriteLinesToFile Lines="%(CppClrSupportProject.Text)"
                       File="$(CppCliHelperProject)" 
-                      Overwrite="true"/>
+                      Overwrite="false"/>
 
     <!-- 
     Do not build - just ask ResolveReferences + IdentifyNetCoreReferences for the information
